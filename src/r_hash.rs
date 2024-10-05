@@ -1,7 +1,7 @@
 //! Types and functions for working with Ruby’s Hash class.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     convert::Infallible,
     fmt,
     hash::Hash,
@@ -797,6 +797,46 @@ impl RHash {
         V: TryConvertOwned,
     {
         let mut map = HashMap::new();
+        self.foreach(|key, value| {
+            map.insert(key, value);
+            Ok(ForEach::Continue)
+        })?;
+        Ok(map)
+    }
+
+    /// Return `self` converted to a Rust [`BTreeMap`].
+    ///
+    /// This will only convert to a map of 'owned' Rust native types. The types
+    /// representing Ruby objects can not be stored in a heap-allocated
+    /// datastructure like a [`BTreeMap`] as they are hidden from the mark phase
+    /// of Ruby's garbage collector, and thus may be prematurely garbage
+    /// collected in the following sweep phase.
+    ///
+    /// Errors if the conversion of any key or value fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::collections::BTreeMap;
+    ///
+    /// use magnus::{Error, RHash, Ruby};
+    ///
+    /// fn example(ruby: &Ruby) -> Result<(), Error> {
+    ///     let r_hash: RHash = ruby.eval(r#"{"answer" => 42}"#)?;
+    ///     let mut btree_map = BTreeMap::new();
+    ///     btree_map.insert(String::from("answer"), 42);
+    ///     assert_eq!(r_hash.to_btree_map()?, btree_map);
+    ///
+    ///     Ok(())
+    /// }
+    /// # Ruby::init(example).unwrap()
+    /// ```
+    pub fn to_btree_map<K, V>(self) -> Result<BTreeMap<K, V>, Error>
+    where
+        K: TryConvertOwned + Eq + Hash + Ord,
+        V: TryConvertOwned,
+    {
+        let mut map = BTreeMap::new();
         self.foreach(|key, value| {
             map.insert(key, value);
             Ok(ForEach::Continue)
