@@ -20,12 +20,13 @@ use std::{
 #[cfg(ruby_use_flonum)]
 pub use flonum::Flonum;
 use rb_sys::{
-    ID, RBasic, VALUE, rb_any_to_s, rb_block_call_kw, rb_check_funcall_kw, rb_check_id,
-    rb_check_id_cstr, rb_check_symbol_cstr, rb_enumeratorize_with_size_kw, rb_eql, rb_equal,
-    rb_funcall_with_block_kw, rb_funcallv_kw, rb_funcallv_public_kw, rb_gc_register_address,
-    rb_gc_unregister_address, rb_hash, rb_id2name, rb_id2sym, rb_inspect, rb_intern3, rb_ll2inum,
-    rb_obj_as_string, rb_obj_classname, rb_obj_freeze, rb_obj_is_kind_of, rb_obj_respond_to,
-    rb_sym2id, rb_ull2inum, ruby_fl_type, ruby_special_consts, ruby_value_type,
+    ID, RB_TYPE, RBasic, StableApiDefinition, VALUE, rb_any_to_s, rb_block_call_kw,
+    rb_check_funcall_kw, rb_check_id, rb_check_id_cstr, rb_check_symbol_cstr,
+    rb_enumeratorize_with_size_kw, rb_eql, rb_equal, rb_funcall_with_block_kw, rb_funcallv_kw,
+    rb_funcallv_public_kw, rb_gc_register_address, rb_gc_unregister_address, rb_hash, rb_id2name,
+    rb_id2sym, rb_inspect, rb_intern3, rb_ll2inum, rb_obj_as_string, rb_obj_class,
+    rb_obj_classname, rb_obj_freeze, rb_obj_is_kind_of, rb_obj_respond_to, rb_sym2id, rb_ull2inum,
+    ruby_special_consts, ruby_value_type, stable_api,
 };
 
 // These don't seem to appear consistently in bindgen output, not sure if they
@@ -720,36 +721,7 @@ pub(crate) mod private {
         // process's memory space if the Value has been allowed to get GC'd
         #[inline]
         fn rb_type(self) -> ruby_value_type {
-            match self.r_basic() {
-                Some(r_basic) => {
-                    unsafe {
-                        let ret = r_basic.as_ref().flags & (ruby_value_type::RUBY_T_MASK as VALUE);
-                        // this bit is safe, ruby_value_type is #[repr(u32)], the flags
-                        // value set by Ruby, and Ruby promises that flags masked like
-                        // this will always be a valid entry in this enum
-                        std::mem::transmute::<u32, ruby_value_type>(ret as u32)
-                    }
-                }
-                None => {
-                    if self.is_false() {
-                        ruby_value_type::RUBY_T_FALSE
-                    } else if self.copy_as_value().is_nil() {
-                        ruby_value_type::RUBY_T_NIL
-                    } else if self.is_true() {
-                        ruby_value_type::RUBY_T_TRUE
-                    } else if self.is_undef() {
-                        ruby_value_type::RUBY_T_UNDEF
-                    } else if self.is_fixnum() {
-                        ruby_value_type::RUBY_T_FIXNUM
-                    } else if self.is_static_symbol() {
-                        ruby_value_type::RUBY_T_SYMBOL
-                    } else if self.is_flonum() {
-                        ruby_value_type::RUBY_T_FLOAT
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
+            unsafe { RB_TYPE(self.as_rb_value()) }
         }
 
         /// Convert `self` to a string. If an error is encountered returns a
@@ -983,31 +955,7 @@ pub trait ReprValue: private::ReprValue {
     /// # Ruby::init(example).unwrap()
     /// ```
     fn class(self) -> RClass {
-        let handle = Ruby::get_with(self);
-        unsafe {
-            match self.r_basic() {
-                Some(r_basic) => RClass::from_rb_value_unchecked(r_basic.as_ref().klass),
-                None => {
-                    if self.is_false() {
-                        handle.class_false_class()
-                    } else if self.is_nil() {
-                        handle.class_nil_class()
-                    } else if self.is_true() {
-                        handle.class_true_class()
-                    } else if self.is_undef() {
-                        panic!("undef does not have a class")
-                    } else if self.is_fixnum() {
-                        handle.class_integer()
-                    } else if self.is_static_symbol() {
-                        handle.class_symbol()
-                    } else if self.is_flonum() {
-                        handle.class_float()
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
-        }
+        unsafe { RClass::from_rb_value_unchecked(rb_obj_class(self.as_rb_value())) }
     }
 
     /// Returns whether `self` is 'frozen'.
@@ -1031,9 +979,7 @@ pub trait ReprValue: private::ReprValue {
     fn is_frozen(self) -> bool {
         match self.r_basic() {
             None => true,
-            Some(r_basic) => unsafe {
-                r_basic.as_ref().flags & ruby_fl_type::RUBY_FL_FREEZE as VALUE != 0
-            },
+            Some(_) => unsafe { stable_api::get_default().frozen_p(self.as_rb_value()) },
         }
     }
 
