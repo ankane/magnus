@@ -17,7 +17,7 @@ use std::{
 
 use rb_sys::{
     self, RTYPEDDATA_GET_DATA, VALUE, rb_data_type_struct__bindgen_ty_1, rb_data_type_t,
-    rb_gc_writebarrier, rb_gc_writebarrier_unprotect, rb_obj_reveal, rb_singleton_class_attached,
+    rb_obj_reveal, rb_singleton_class_attached,
     rb_singleton_class_clone,
     rbimpl_typeddata_flags::{self, RUBY_TYPED_FREE_IMMEDIATELY, RUBY_TYPED_WB_PROTECTED},
     size_t,
@@ -38,6 +38,12 @@ use crate::{
         private::{self, ReprValue as _},
     },
 };
+
+unsafe fn rb_gc_writebarrier(_old: VALUE, _young: VALUE) {
+}
+
+unsafe fn rb_gc_writebarrier_unprotect(_obj: VALUE) {
+}
 
 /// A C struct containing metadata on a Rust type, for use with the
 /// `rb_data_typed_object_wrap` API.

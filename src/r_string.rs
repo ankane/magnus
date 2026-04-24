@@ -994,8 +994,9 @@ impl RString {
     pub fn enc_coderange(self) -> Coderange {
         unsafe {
             transmute(
-                (self.r_basic_unchecked().as_ref().flags
-                    & ruby_coderange_type::RUBY_ENC_CODERANGE_MASK as VALUE) as u32,
+                // (self.r_basic_unchecked().as_ref().flags
+                //     & ruby_coderange_type::RUBY_ENC_CODERANGE_MASK as VALUE) as u32,
+                0
             )
         }
     }
@@ -1043,10 +1044,10 @@ impl RString {
     /// # Ruby::init(example).unwrap()
     /// ```
     pub fn enc_coderange_clear(self) {
-        unsafe {
-            self.r_basic_unchecked().as_mut().flags &=
-                !(ruby_coderange_type::RUBY_ENC_CODERANGE_MASK as VALUE)
-        }
+        // unsafe {
+        //     self.r_basic_unchecked().as_mut().flags &=
+        //         !(ruby_coderange_type::RUBY_ENC_CODERANGE_MASK as VALUE)
+        // }
     }
 
     /// Sets `self`'s cached coderange.
@@ -1103,7 +1104,7 @@ impl RString {
     pub unsafe fn enc_coderange_set(self, cr: Coderange) {
         unsafe {
             self.enc_coderange_clear();
-            self.r_basic_unchecked().as_mut().flags |= cr as VALUE;
+            // self.r_basic_unchecked().as_mut().flags |= cr as VALUE;
         }
     }
 
